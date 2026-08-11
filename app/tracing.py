@@ -3,6 +3,8 @@ from __future__ import annotations
 import os
 from typing import Any
 
+__all__ = ["get_langfuse_client", "observe", "tracing_enabled", "LANGFUSE_SDK_AVAILABLE"]
+
 try:
     from langfuse import get_client, observe
 
