@@ -2,23 +2,23 @@
 
 ## 1. Thông tin nhóm
 
-- Tên nhóm:
-- Repository URL:
-- Commit SHA cuối:
+- Tên nhóm: **B4.1**.
+- Repository URL: [K4-DAY13-2A202601884](https://github.com/minhquang1604/K4-DAY13-2A202601884.git).
+- Commit SHA cuối: `5bc606a` tại thời điểm hoàn thiện report; cập nhật lại bằng `git rev-parse --short HEAD` sau commit report cuối.
 - Thành viên và vai trò:
-- Điền Mạnh Hùng - 2A202601888 -
-- Nguyễn Lâm Tùng Bách - 2A202601830 -
-- Trần Phú Nghĩa - 2A20260233871 -
-- Cao Minh Quang - 2A202601884 -
-- Trần Minh Quang - 2A202601856 - Thành viên E (QA & Chief Investigator): Chạy load test, bọc trace cho sub-component RAG/LLM (phần mở rộng), dẫn dắt điều tra Challenge (CP3) và hoàn thiện báo cáo nhóm.
+  - Điền Mạnh Hùng — `2A202601888`: SRE, SLO, alert và runbook.
+  - Nguyễn Lâm Tùng Bách — `2A202601830`: metrics và dashboard.
+  - Trần Phú Nghĩa — `2A20260233871`: middleware, correlation ID và log–trace correlation.
+  - Cao Minh Quang — `2A202601884`: PII redaction và kiểm tra secret/PII.
+  - Trần Minh Quang — `2A202601856`: QA, trace spans và điều tra challenge.
 
 
 ## 2. Kết quả kỹ thuật
 
-- Điểm `validate_logs.py`:
-- Tổng số traces:
-- Số PII leak còn lại:
-- Link/đường dẫn dashboard:
+- Điểm `validate_logs.py`: **100/100** trên log sạch sau CP1 ([evidence correlation ID](evidence/cp1-correlation-id-after.txt)); không dùng baseline CP0 30/100 để đánh giá kết quả cuối.
+- Tổng số traces có evidence: **11** trace log-correlation ban đầu và **10 trace managed prompt QA**; xem [evidence CP2 correlation](evidence/cp2-log-trace-correlation.txt) và [managed prompt versioning](evidence/cp2-managed-prompt-versioning.md).
+- Số PII leak còn lại: **0**; xem [final PII/secret audit](evidence/final_pii_secret_audit.md).
+- Link/đường dẫn dashboard: route `/dashboard` khi chạy app; evidence cuối: [dashboard-final.png](evidence/dashboard-final.png).
 
 ### Baseline CP0 (2026-08-11)
 
@@ -32,8 +32,8 @@
 
 - Evidence correlation ID: [cp1-correlation-id-after.txt](evidence/cp1-correlation-id-after.txt) (header round-trip, 0 rò context ở `--concurrency 5`, validator 30/100 → 100/100) và [cp2-log-trace-correlation.txt](evidence/cp2-log-trace-correlation.txt) (11/11 record ghép 1-1 `correlation_id` ↔ `trace_id`).
 - Evidence PII redaction: [cp1_pii_redaction_notes.md](evidence/cp1_pii_redaction_notes.md), [cp1_pii_redaction_logs.jsonl](evidence/cp1_pii_redaction_logs.jsonl).
-- Evidence trace waterfall:
-- Giải thích một span đáng chú ý:
+- Evidence trace waterfall: [trace baseline v1 `21078f5a...`](https://cloud.langfuse.com/project/cmsocqvkb01qjad0gjiivg97d/traces/21078f5a7f64abd98de7dab1fa5b2cb3) và [trace candidate v2 `9c23cd22...`](https://cloud.langfuse.com/project/cmsocqvkb01qjad0gjiivg97d/traces/9c23cd2239f2e7eec6140954d85a9f3e) đều có observation `rag_retrieve`/`llm_generate`; metadata và 10 trace QA được ghi tại [managed prompt evidence](evidence/cp2-managed-prompt-versioning.md).
+- Giải thích một span đáng chú ý: `rag_retrieve` là span bất thường khi `rag_slow` bật vì retrieval block 2.5 giây; `llm_generate` chỉ khoảng 150 ms. Chênh lệch này, cùng P95 tăng hơn 2.5 giây, khoanh vùng retrieval là nguyên nhân trực tiếp.
 
 ### Middleware và correlation ID (Nghĩa)
 
@@ -47,32 +47,32 @@ Ba cơ chế trong [app/middleware.py](../app/middleware.py) và [app/main.py](.
 
 **Giới hạn đã biết — liên quan trực tiếp tới preventive measure #1 ở mục 6.** Header `x-response-time-ms` và field `latency_ms` **không thể** đo được queue wait, và metric `queue_wait_ms` cũng không cài đặt được trong middleware này. Lý do: khi event loop bị chặn, `dispatch()` của middleware chưa hề bắt đầu chạy, nên mốc `start` được ghi *sau* khi đã xếp hàng xong. Đó chính là vì sao `latency_ms` server-side báo 3.6s trong khi client chờ 17.9s. Muốn đo queue wait phải lấy mốc ở tầng ASGI server hoặc đối chiếu timestamp do client gửi kèm, không phải ở middleware ứng dụng.
 
-Rà soát cuối trên bản đã merge cả 4 thành viên (commit `78805cf`): `pytest` 43 passed; `validate_dashboard.py` 6/6 panel, 7/7 field; smoke test một request có PII trả header `x-request-id: req-11223344` + `x-response-time-ms: 1202.93`, log ghi đủ `correlation_id`/`trace_id`/enrichment và che `[REDACTED_EMAIL]`, `[REDACTED_PHONE_VN]`, `grep` không thấy email/số điện thoại nguyên văn.
+Rà soát tại commit tích hợp `78805cf`: `pytest` 43 passed; `validate_dashboard.py` 6/6 panel, 7/7 field; smoke test một request có PII trả header `x-request-id: req-11223344` + `x-response-time-ms: 1202.93`, log ghi đủ `correlation_id`/`trace_id`/enrichment và che `[REDACTED_EMAIL]`, `[REDACTED_PHONE_VN]`, `grep` không thấy email/số điện thoại nguyên văn. Final QA sau đó vẫn giữ nguyên 43 tests pass và các validator đều đạt.
 
 ### SRE acceptance gate — CP1 (Hùng)
 
-Chưa sign-off cho đến khi CP1 có bằng chứng chạy lại `validate_logs.py` đạt tối thiểu 80/100. Với mỗi event của `service=api`, log phải cho phép SRE trả lời được **request nào, đang ở môi trường nào, ảnh hưởng gì và có thể liên kết evidence nào**:
+**Đã sign-off:** `validate_logs.py` đạt 100/100, vượt gate tối thiểu 80/100; final QA có 20 records, 10 correlation IDs và 0 PII leak. Với mỗi event của `service=api`, log cho phép SRE trả lời được **request nào, đang ở môi trường nào, ảnh hưởng gì và có thể liên kết evidence nào**:
 
 - `correlation_id` hợp lệ, xuất hiện xuyên suốt request/response và trả về qua header để nối metrics → traces → logs.
 - Context request bắt buộc: `env`, `user_id_hash`, `session_id`, `feature`, `model`; chỉ dùng hash cho user ID và không ghi PII nguyên văn.
 - `response_sent` phải có `latency_ms`, `tokens_in`, `tokens_out`, `cost_usd`, `quality_score` để đo SLO latency/cost/quality.
 - `request_failed` phải có `error_type` và cùng context để alert có thể phân loại ảnh hưởng theo lỗi thay vì theo implementation nội bộ.
-- Điều kiện đưa vào CP2: có ít nhất 2 correlation ID riêng biệt, không còn PII leak, và log đủ trường để dashboard dùng `data/logs.jsonl` làm nguồn chuẩn.
+- Điều kiện đưa vào CP2 đã đạt: có ít nhất 2 correlation ID riêng biệt, không còn PII leak, và log đủ trường để dashboard dùng `data/logs.jsonl` làm nguồn chuẩn.
 
 Mục tiêu SLO đã được giữ theo contract: P95 latency ≤ 3000 ms, error rate ≤ 2%, daily cost ≤ 2.5 USD và quality trung bình ≥ 0.75. Alert rule/runbook cụ thể sẽ được triển khai ở CP2 sau khi các tín hiệu này được xác thực.
 
 ## 4. Prompt versioning
 
-- Prompt name:
-- Version/label baseline:
-- Version/label candidate:
-- Trace ID của mỗi version:
-- Bằng chứng đổi label hoặc rollback:
+- Prompt name: `day13-chat`.
+- Version/label baseline: **v1**, labels cuối `baseline`, `production`.
+- Version/label candidate: **v2**, labels cuối `candidate`, `latest`.
+- Trace ID mỗi version: baseline v1 `21078f5a7f64abd98de7dab1fa5b2cb3`; candidate v2 `9c23cd2239f2e7eec6140954d85a9f3e`.
+- Bằng chứng đổi label/rollback: đã chuyển `production` sang v2 và xác minh bằng trace `c308216c1542c32260ef4c5041914285`; sau đó rollback về v1 và xác minh bằng trace `c6107a2d17d81fc90a9d61c19e6c68d4`. Trạng thái cuối đã đọc lại qua API: v1 giữ `production`. Chi tiết và direct links: [CP2 managed prompt versioning](evidence/cp2-managed-prompt-versioning.md).
 
 ## 5. Dashboard, SLO và alerts
 
-- Kết quả `validate_dashboard.py`:
-- Evidence dashboard:
+- Kết quả `validate_dashboard.py`: **HỢP LỆ: 6/6 panel; 7/7 field có trong logging schema**.
+- Evidence dashboard: [dashboard-final.png](evidence/dashboard-final.png), [CP4 dashboard review](../docs/CP4_DASHBOARD_FINAL_REVIEW.md) và [CP4 metrics analysis](evidence/cp4-final-metrics-analysis.txt).
 - SLO đã chọn và lý do: P95 latency ≤ 3000 ms, error rate ≤ 2%, daily cost ≤ 2.5 USD và quality trung bình ≥ 0.75, khớp với dashboard contract để một tín hiệu có thể được phát hiện và điều tra bằng cùng dữ liệu log.
 - Alert rules và runbook: [config/alert_rules.yaml](../config/alert_rules.yaml) và [docs/alerts.md](../docs/alerts.md) — alert tail latency, error rate và daily cost; mỗi alert có severity, owner Hùng (SRE), condition, triage Metrics → Traces → Logs và mitigation tạm thời.
 
@@ -80,18 +80,18 @@ Mục tiêu SLO đã được giữ theo contract: P95 latency ≤ 3000 ms, erro
 
 - Kiểm tra cuối: `python scripts/validate_dashboard.py` hợp lệ 6/6 panel và 7/7 logging fields; `python -m pytest -q` có 43 tests passed.
 - Demo SRE: mở panel Latency để chỉ ra P95 vượt ngưỡng, mở trace của request chậm để so sánh `rag_retrieve` với `llm_generate`, sau đó dùng `correlation_id` tìm log tương ứng và đọc mitigation trong Alert 1.
-- Evidence còn cần chụp trước khi nộp: trace waterfall của code đã merge, với Langfuse kết nối thành công và correlation ID hợp lệ.
+- QA cuối: `validate_logs.py` đạt 100/100 trên 20 records/10 correlation IDs; 10 managed traces đã được API xác minh đủ prompt metadata. Kết quả tổng hợp ở [final-validation.txt](evidence/final-validation.txt).
+- Evidence UI cần lưu thủ công trước khi nộp: ảnh danh sách prompt v1/v2, trạng thái switch `production` sang v2, rollback về v1 và trace waterfall; tên file/đường dẫn mở trực tiếp được ghi trong [managed prompt evidence](evidence/cp2-managed-prompt-versioning.md).
 
 ## 6. Điều tra challenge
 
 - Challenge ID: `day13-k4-observability-v1` (cohort K4, incident `rag_slow`, `affected_feature=monitoring`, `latency_threshold_ms=2000`, xem `config/challenge.json`).
 - Triệu chứng từ metrics: baseline (10 request) có P50/P95/P99 = 151 ms. Khi chạy workload challenge với `rag_slow`, P95/P99 = 2659 ms, vượt challenge threshold 2000 ms. Một lần chạy Langfuse-enabled riêng cũng ghi P95/P99 = 3481 ms; chênh lệch do môi trường/prompt resolution khác nhau, nhưng cả hai lần đều xác nhận tail latency là triệu chứng chính. Chi tiết: `submission/evidence/cp3_load_test_and_metrics.md` và [CP3 rag_slow investigation](evidence/cp3-rag-slow-investigation.md).
-- Trace ID liên quan: `7bc2c339e500086c3e0f504cf3d15458`, latency 3.483 s, ghi ở một lần chạy Langfuse-enabled riêng trước khi middleware/correlation ID được merge. Chưa có trace ID mới từ môi trường điều tra của Thành viên E vì `.env` cục bộ chưa có `LANGFUSE_PUBLIC_KEY`/`SECRET_KEY` (`tracing_enabled=false`) — cần chạy lại với key thật để chụp trace waterfall cho span `rag_retrieve`/`llm_generate` đã merge.
-- Log line/correlation ID liên quan: chạy lại toàn bộ luồng challenge (`inject_incident.py` → `load_test.py --challenge --concurrency 5` → `inject_incident.py --disable`) trên code đã merge (middleware + `bind_contextvars` + `trace_id` field). Evidence mới: `submission/evidence/cp3_challenge_logs.jsonl`. Khác với lần chạy trước, giờ **không cần đối chiếu bằng timestamp nữa** — mỗi cặp `request_received`/`response_sent` chia sẻ đúng một `correlation_id`, ví dụ:
-  - `correlation_id=req-e7627862`: `request_received` lúc `08:54:16.483374Z` (feature=monitoring, session_id=k4-challenge-s05), `response_sent` lúc `08:54:19.153003Z` với `latency_ms=2657`, `trace_id=null` (đúng vì tracing đang tắt cục bộ).
-  - Tương tự cho 4 correlation_id còn lại (`req-e0d52e9a`, `req-bf4302f5`, `req-d34a0424`, `req-0dabbc01`), mỗi request đều có `user_id_hash`, `session_id`, `feature`, `model`, `env` đầy đủ nhờ `bind_contextvars` trong `app/main.py`.
-  - `incident_enabled`/`incident_disabled` cũng mang `correlation_id` riêng (`req-f267630e`, `req-3ac5cf46`), đóng khung đúng cửa sổ thời gian incident.
-  - Hiện tượng tuần tự hoá vẫn tái hiện y hệt lần chạy trước dù code đã cập nhật: 5 `request_received` cách nhau đều đặn ~2.65s (`08:54:16.483`, `08:54:19.156`, `08:54:21.811`, `08:54:24.467`, `08:54:27.122`) dù gửi đồng thời với `--concurrency 5`, trong khi `latency_ms` nội bộ mỗi request luôn ~2651-2657ms — khớp với `time.sleep(2.5)` trong `retrieve()` (`app/mock_rag.py`) cộng ~150ms LLM (`app/mock_llm.py`). Client-side (`scripts/load_test.py`) đo được 10.7s-13.3s cho batch này, xác nhận lại đúng khoảng "queue wait" đã nêu ở lần chạy trước.
+- Trace ID challenge liên quan: `7bc2c339e500086c3e0f504cf3d15458`, latency 3.483 s. Code cuối đã có span `rag_retrieve` ([mock_rag.py](../app/mock_rag.py)) và generation `llm_generate` ([mock_llm.py](../app/mock_llm.py)); các trace managed mới xác nhận instrumentation này hoạt động, còn trace challenge dùng để chứng minh hiện tượng `rag_slow`.
+- Log line/correlation ID liên quan: evidence challenge ban đầu trong `submission/evidence/cp3_challenge_logs.jsonl` được tạo trước khi middleware được tích hợp nên phải đối chiếu bằng timestamp/nội dung message:
+  - `incident_enabled` lúc `07:55:31.841959Z` (bật `rag_slow`).
+  - 5 dòng `request_received` của 5 query challenge cách nhau đều đặn **~2.65s** dù được gửi đồng thời với `--concurrency 5`: `07:55:39.543`, `07:55:42.202`, `07:55:44.858`, `07:55:47.522`, `07:55:50.176`.
+  - 5 dòng `response_sent` tương ứng đều có `latency_ms≈2650-2659`, khớp với thời gian `time.sleep(2.5)` được inject trong `retrieve()` (`app/mock_rag.py`) cộng ~150ms gọi LLM (`app/mock_llm.py`).
 - Root cause: hai lớp nguyên nhân, cả hai đều được chứng minh bằng log/metric ở trên.
   1. **Nguyên nhân theo kịch bản incident**: `rag_slow=True` khiến `retrieve()` block 2.5s mỗi lần gọi (`app/mock_rag.py:18`) — chiếm ~94% latency của mỗi request (2.5s/2.65s), trong khi phần LLM chỉ ~150ms. Đây chính là span sẽ hiện "bất thường" khi xem trace waterfall sau khi bật Langfuse.
   2. **Yếu tố khuếch đại phát hiện qua load test**: endpoint `POST /chat` khai báo `async def` nhưng gọi thẳng `agent.run(...)` là hàm đồng bộ, blocking (`app/main.py:68`), không dùng `run_in_threadpool`/`asyncio.to_thread`. Vì vậy lệnh `time.sleep(2.5)` bên trong chặn luôn event loop của Uvicorn, khiến 5 request gửi đồng thời bị xử lý tuần tự thay vì song song — 5 dòng `request_received` cách đều 2.65s là bằng chứng trực tiếp. Kết quả là độ trễ client thấy được (10.7s–13.3s, đo bởi `scripts/load_test.py`) cao hơn nhiều so với `latency_ms` nội bộ (~2.65s) ghi trong log — một khoảng "queue wait" hiện không được đo bằng metric nào cả. Nghĩa độc lập ghi nhận đúng hiện tượng này ở mục 3 (dòng "Giới hạn đã biết") kèm giải thích vì sao `queue_wait_ms` không thể đo được trong middleware: `dispatch()` chỉ bắt đầu chạy sau khi request đã xếp hàng xong, nên mốc `start` bị ghi trễ.
@@ -109,7 +109,8 @@ Với mỗi thành viên, ghi rõ nhiệm vụ và link commit/PR tương ứng.
 
 | Thành viên | Phần việc | Commit/PR | Điều đã học |
 |---|---|---|---|
-| E (QA & Chief Investigator) | Chạy load test practice và challenge (`scripts/load_test.py`); bọc trace `rag_retrieve`/`llm_generate` cho sub-component RAG/LLM (`app/mock_rag.py`, `app/mock_llm.py`); điều tra CP3 (`config/challenge.json`) và viết mục 6 báo cáo | *(điền commit SHA sau khi commit)* | Blocking call trong `async def` FastAPI handler chặn cả event loop và khuếch đại tail latency dưới tải đồng thời — phải phân biệt `latency_ms` nội bộ với latency client thấy được (queue wait) khi điều tra incident. |
-| A — Nghĩa (Middleware) | Correlation ID middleware: clear contextvars, validate/sinh `req-<8 hex>`, response header `x-request-id` + `x-response-time-ms` ([app/middleware.py](../app/middleware.py)); enrich log context `user_id_hash`/`session_id`/`feature`/`model`/`env` ([app/main.py](../app/main.py)); liên kết hai chiều log ↔ trace ([app/agent.py](../app/agent.py), [app/tracing.py](../app/tracing.py)); 8 test mới ([tests/test_middleware_correlation.py](../tests/test_middleware_correlation.py), [tests/test_trace_correlation.py](../tests/test_trace_correlation.py)); điều tra tầng log ở CP3 | PR #3, #5 (CP1), PR #9 (CP2), PR CP3 — nhánh `feat/nghia-*` | Correlation ID không chỉ để tra cứu: chính **timestamp của `request_received`** đã chứng minh event loop bị chặn — 5 request gửi đồng thời nhưng vào handler cách nhau 3.6s. Metric p95 server-side che giấu hoàn toàn triệu chứng này (3.6s so với 17.9s người dùng thật chờ). Log trả lời được câu hỏi mà metric không đặt ra. |
-| Hùng (SRE/Alerts) | SLO, 3 alert symptom-based, runbook, SRE acceptance gate và evidence incident `rag_slow` | `100c39a`, `ef46424`, `779f16f` | Điều tra phải nối metrics → trace → log bằng correlation ID; latency tổng cần tách với queue wait để chọn đúng mitigation. |
-| | | | |
+| Điền Mạnh Hùng | SLO, ba alert symptom-based, runbook, SRE acceptance gate và evidence incident `rag_slow` | `100c39a`, `ef46424`, `779f16f`, `169d63f` | Điều tra phải nối metrics → trace → log bằng correlation ID; latency tổng cần tách với queue wait để chọn đúng mitigation. |
+| Nguyễn Lâm Tùng Bách | Contract log cho dashboard, sáu panel runtime, SLO threshold và evidence dashboard/metrics CP3–CP4 | `66b42b8`, `bdf7776`, `577a212`, `d40c8f3` | P95, traffic, error, cost, token và quality cần cùng dùng structured logs và có ngưỡng rõ ràng để phát hiện incident. |
+| Trần Phú Nghĩa | Middleware correlation ID, request-context enrichment, log ↔ trace correlation, test và investigation tầng log | `56cf9bd`, `0d9e3ee`, `30c40f9`, `d7ce9f4` | Correlation ID và timestamp log có thể chứng minh queue wait mà metric server-side không đo được. |
+| Cao Minh Quang | PII scrubber, audit PII trong log/trace và rà soát secret/PII trước push | `00ba3a0`, `756ad7a`, `73cb068`, `b829ef8` | Redaction phải diễn ra trước JSON rendering và phải audit cả log lẫn metadata trace. |
+| Trần Minh Quang | QA, load test practice/challenge, instrumentation `rag_retrieve`/`llm_generate`, managed prompt v1/v2, kiểm chứng label switch/rollback và điều tra CP3 | `245ec00`, `4b175b9`; commit final QA do Hùng tạo sau khi review | Blocking call trong `async def` chặn event loop; prompt label cho phép rollout/rollback mà không đổi code và trace metadata phải ghi rõ version thực thi. |
