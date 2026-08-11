@@ -3,12 +3,14 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass
 
+from structlog.contextvars import get_contextvars
+
 from . import metrics
 from .mock_llm import FakeLLM
 from .mock_rag import retrieve
 from .pii import hash_user_id, summarize_text
 from .prompt_management import resolve_prompt
-from .tracing import get_langfuse_client, observe, tracing_enabled
+from .tracing import current_trace_id, get_langfuse_client, observe, tracing_enabled
 
 
 @dataclass
@@ -19,6 +21,7 @@ class AgentResult:
     tokens_out: int
     cost_usd: float
     quality_score: float
+    trace_id: str | None = None
 
 
 class LabAgent:
@@ -43,6 +46,11 @@ class LabAgent:
         latency_ms = int((time.perf_counter() - started) * 1000)
         cost_usd = self._estimate_cost(response.usage.input_tokens, response.usage.output_tokens)
 
+        # Same id the middleware bound to the logs, so a trace can be walked
+        # back to its log lines. It rides on the generation because the trace
+        # metadata contract is pinned to prompt keys by test_agent_prompt_trace.
+        correlation_id = get_contextvars().get("correlation_id")
+
         langfuse_client.update_current_trace(
             user_id=hash_user_id(user_id),
             session_id=session_id,
@@ -57,6 +65,7 @@ class LabAgent:
         langfuse_client.update_current_generation(
             model=self.model,
             metadata={
+                "correlation_id": correlation_id,
                 "doc_count": len(docs),
                 "query_preview": summarize_text(message),
                 "prompt_name": prompt.name,
@@ -88,6 +97,7 @@ class LabAgent:
             tokens_out=response.usage.output_tokens,
             cost_usd=cost_usd,
             quality_score=quality_score,
+            trace_id=current_trace_id(langfuse_client),
         )
 
     def _estimate_cost(self, tokens_in: int, tokens_out: int) -> float:
