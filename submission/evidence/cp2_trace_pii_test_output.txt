@@ -1,46 +1,13 @@
 ============================= test session starts ==============================
-platform linux -- Python 3.12.3, pytest-7.4.4, pluggy-1.4.0 -- /usr/bin/python3
+platform linux -- Python 3.12.3, pytest-8.3.5, pluggy-1.6.0 -- /home/quang/projects/Lab/B4.1-Day13-K4-Observability/.venv/bin/python3
 cachedir: .pytest_cache
 rootdir: /home/quang/projects/Lab/B4.1-Day13-K4-Observability
-plugins: anyio-4.13.0
+configfile: pyproject.toml
+plugins: anyio-4.14.2
 collecting ... collected 2 items
 
-tests/test_trace_pii_redaction.py::test_trace_and_generation_metadata_do_not_leak_raw_pii FAILED [ 50%]
+tests/test_trace_pii_redaction.py::test_trace_and_generation_metadata_do_not_leak_raw_pii PASSED [ 50%]
 tests/test_trace_pii_redaction.py::test_observe_decorator_disables_raw_input_output_capture PASSED [100%]
 
-=================================== FAILURES ===================================
-____________ test_trace_and_generation_metadata_do_not_leak_raw_pii ____________
-
-monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7ebfeb699f70>
-
-    def test_trace_and_generation_metadata_do_not_leak_raw_pii(monkeypatch) -> None:
-        monkeypatch.setenv("LANGFUSE_PUBLIC_KEY", "test-public-key")
-        monkeypatch.setenv("LANGFUSE_SECRET_KEY", "test-secret-key")
-        monkeypatch.setenv("LANGFUSE_PROMPT_NAME", "day13-chat")
-        monkeypatch.setenv("LANGFUSE_PROMPT_LABEL", "production")
-    
-        client = RecordingLangfuseClient()
-        monkeypatch.setattr(agent_module, "get_langfuse_client", lambda: client)
-    
-        raw_user_id = "raw-user-42"
-        raw_email = "student@vinuni.edu.vn"
-        raw_phone = "0987654321"
-        message = f"My email is {raw_email} and my phone is {raw_phone}"
-    
-        agent = agent_module.LabAgent()
-        # Gọi thẳng hàm gốc (__wrapped__) để bỏ qua decorator @observe thật của
-        # Langfuse SDK (tránh gọi mạng trong test), giống pattern ở
-        # test_agent_prompt_trace.py.
->       agent_module.LabAgent.run.__wrapped__(
-            agent,
-            user_id=raw_user_id,
-            feature="qa",
-            session_id="session-01",
-            message=message,
-        )
-E       AttributeError: 'function' object has no attribute '__wrapped__'
-
-tests/test_trace_pii_redaction.py:54: AttributeError
-=========================== short test summary info ============================
-FAILED tests/test_trace_pii_redaction.py::test_trace_and_generation_metadata_do_not_leak_raw_pii
-========================= 1 failed, 1 passed in 0.02s ==========================
+============================== 2 passed in 0.67s ===============================
+Failed to export span batch code: 401, reason: Unauthorized
