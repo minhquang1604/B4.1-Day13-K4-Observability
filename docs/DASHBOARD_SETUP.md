@@ -2,6 +2,9 @@
 
 `config/dashboard.yaml` là contract chấm điểm dùng chung, không phụ thuộc việc nhóm dựng dashboard trong Langfuse hay một công cụ local. File này quy định đúng nguồn dữ liệu, phép tổng hợp, đơn vị và threshold cho sáu panel.
 
+Kết quả audit event/field ở CP1 được ghi tại
+[CP1_DASHBOARD_LOG_AUDIT.md](CP1_DASHBOARD_LOG_AUDIT.md).
+
 Trường `query` trong YAML là pseudocode mô tả phép tính, không phải câu lệnh để copy nguyên vào mọi công cụ. Nhóm chuyển cùng logic đó sang cú pháp của công cụ đã chọn.
 
 ## Mapping dữ liệu

@@ -63,3 +63,22 @@ def test_validator_rejects_panel_without_query_example(tmp_path: Path) -> None:
 
     assert result.returncode == 1
     assert "latency.query" in result.stdout
+
+
+def test_validator_rejects_dashboard_field_missing_from_log_schema(
+    tmp_path: Path,
+) -> None:
+    payload = yaml.safe_load(
+        (REPO_ROOT / "config" / "dashboard.yaml").read_text(encoding="utf-8")
+    )
+    payload["dashboard"]["panels"][0]["fields"] = ["unknown_latency_field"]
+    invalid_config = tmp_path / "dashboard.yaml"
+    invalid_config.write_text(
+        yaml.safe_dump(payload, sort_keys=False, allow_unicode=True), encoding="utf-8"
+    )
+
+    result = run_validator(invalid_config)
+
+    assert result.returncode == 1
+    assert "unknown_latency_field" in result.stdout
+    assert "logging schema" in result.stdout
