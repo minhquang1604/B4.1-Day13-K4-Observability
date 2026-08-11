@@ -1,0 +1,41 @@
+# CP0 baseline — trước khi làm middleware (role A)
+# Chạy: uvicorn app.main:app --env-file .env  +  python scripts/load_test.py
+# Thời điểm: 2026-08-11
+
+$ curl -i http://127.0.0.1:8000/health
+HTTP/1.1 200 OK
+server: uvicorn
+content-type: application/json
+
+{"ok":true,"tracing_enabled":false,"incidents":{"rag_slow":false,"tool_fail":false,"cost_spike":false}}
+
+(response KHÔNG có header x-request-id / x-response-time-ms)
+
+$ python scripts/load_test.py
+[200] MISSING | qa | 259.3ms
+[200] MISSING | qa | 155.0ms
+[200] MISSING | summary | 160.6ms
+... (10 request, tất cả correlation_id = MISSING)
+
+$ python scripts/validate_logs.py
+--- Lab Verification Results ---
+Total log records analyzed: 21
+Records with missing required fields: 20
+Records with missing enrichment (context): 20
+Unique correlation IDs found: 0
+Potential PII leaks detected: 0
+
+--- Grading Scorecard (Estimates) ---
+- [FAILED] Missing required fields (ts, level, etc.)
+- [FAILED] Correlation ID propagation (less than 2 unique IDs)
+- [FAILED] Log enrichment (missing user_id_hash, etc.)
++ [PASSED] PII scrubbing
+
+Estimated Score: 30/100
+
+# Mẫu log record baseline (service=api) — thiếu correlation_id và enrichment:
+{"service": "api", "payload": {"message_preview": "What is your refund policy? My email is [REDACTED_EMAIL]"}, "event": "request_received", "level": "info", "ts": "2026-08-11T07:47:01.041627Z"}
+
+# Keys hiện có trong record service=api:
+# cost_usd, event, latency_ms, level, payload, quality_score, service, tokens_in, tokens_out, ts
+# Thiếu: correlation_id, user_id_hash, session_id, feature, model, env

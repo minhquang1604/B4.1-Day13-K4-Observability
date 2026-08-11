@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -13,6 +14,7 @@ if str(REPO_ROOT) not in sys.path:
 from app.cli import configure_utf8_stdio
 
 
+DEFAULT_LOGGING_SCHEMA = REPO_ROOT / "config" / "logging_schema.json"
 REQUIRED_PANEL_IDS = frozenset(
     {"latency", "traffic", "errors", "cost", "tokens", "quality"}
 )
@@ -32,7 +34,46 @@ class DashboardConfigError(ValueError):
     pass
 
 
-def load_dashboard_config(path: Path) -> dict:
+def load_logging_schema(path: Path) -> dict:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise DashboardConfigError(f"Không tìm thấy logging schema: {path}") from exc
+    except json.JSONDecodeError as exc:
+        raise DashboardConfigError(
+            f"Logging schema không phải JSON hợp lệ: {exc}"
+        ) from exc
+
+    properties = payload.get("properties") if isinstance(payload, dict) else None
+    if not isinstance(properties, dict):
+        raise DashboardConfigError("Logging schema thiếu object 'properties'")
+    return payload
+
+
+def validate_log_field_contract(dashboard: dict, logging_schema: dict) -> None:
+    """Ensure every field used by a dashboard panel is part of the log schema."""
+    schema_fields = set(logging_schema["properties"])
+    missing_by_panel: dict[str, list[str]] = {}
+
+    for panel in dashboard["panels"]:
+        missing = sorted(set(panel["fields"]) - schema_fields)
+        if missing:
+            missing_by_panel[panel["id"]] = missing
+
+    if missing_by_panel:
+        details = "; ".join(
+            f"{panel_id}: {', '.join(fields)}"
+            for panel_id, fields in sorted(missing_by_panel.items())
+        )
+        raise DashboardConfigError(
+            f"Dashboard dùng field chưa có trong logging schema: {details}"
+        )
+
+
+def load_dashboard_config(
+    path: Path,
+    logging_schema_path: Path = DEFAULT_LOGGING_SCHEMA,
+) -> dict:
     try:
         payload = yaml.safe_load(path.read_text(encoding="utf-8"))
     except FileNotFoundError as exc:
@@ -90,6 +131,8 @@ def load_dashboard_config(path: Path) -> dict:
         if not isinstance(threshold.get("value"), (int, float)):
             raise DashboardConfigError(f"'{panel_id}.threshold.value' phải là một số")
 
+    logging_schema = load_logging_schema(logging_schema_path)
+    validate_log_field_contract(dashboard, logging_schema)
     return payload
 
 
@@ -102,15 +145,29 @@ def main() -> int:
         default=REPO_ROOT / "config" / "dashboard.yaml",
         help="Đường dẫn tới dashboard YAML",
     )
+    parser.add_argument(
+        "--logging-schema",
+        type=Path,
+        default=DEFAULT_LOGGING_SCHEMA,
+        help="Đường dẫn tới JSON schema của structured log",
+    )
     args = parser.parse_args()
 
     try:
-        load_dashboard_config(args.config)
+        payload = load_dashboard_config(args.config, args.logging_schema)
     except DashboardConfigError as exc:
         print(f"KHÔNG HỢP LỆ: {exc}")
         return 1
 
-    print(f"HỢP LỆ: {len(REQUIRED_PANEL_IDS)}/6 panel có trong dashboard contract.")
+    dashboard_fields = {
+        field
+        for panel in payload["dashboard"]["panels"]
+        for field in panel["fields"]
+    }
+    print(
+        f"HỢP LỆ: {len(REQUIRED_PANEL_IDS)}/6 panel có trong dashboard contract; "
+        f"{len(dashboard_fields)}/{len(dashboard_fields)} field có trong logging schema."
+    )
     return 0
 
 

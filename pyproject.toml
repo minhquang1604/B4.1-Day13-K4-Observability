@@ -1,0 +1,8 @@
+[tool.pyright]
+# langfuse's package __init__.py re-exports get_client/observe without
+# declaring __all__, so pyright flags the SDK's own documented import path
+# (`from langfuse import get_client, observe`, used in app/tracing.py and
+# tests/test_tracing_adapter.py) as a private-symbol import. The tracing
+# adapter and its tests intentionally bind to these exact SDK objects, so
+# this is an upstream packaging gap, not a bug in this project's code.
+reportPrivateImportUsage = "none"
