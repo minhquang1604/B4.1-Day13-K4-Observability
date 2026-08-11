@@ -53,8 +53,8 @@ Mục tiêu SLO đã được giữ theo contract: P95 latency ≤ 3000 ms, erro
 
 - Kết quả `validate_dashboard.py`:
 - Evidence dashboard:
-- SLO đã chọn và lý do:
-- Alert rules và runbook:
+- SLO đã chọn và lý do: P95 latency ≤ 3000 ms, error rate ≤ 2%, daily cost ≤ 2.5 USD và quality trung bình ≥ 0.75, khớp với dashboard contract để một tín hiệu có thể được phát hiện và điều tra bằng cùng dữ liệu log.
+- Alert rules và runbook: [config/alert_rules.yaml](../config/alert_rules.yaml) và [docs/alerts.md](../docs/alerts.md) — alert tail latency, error rate và daily cost; mỗi alert có severity, owner Hùng (SRE), condition, triage Metrics → Traces → Logs và mitigation tạm thời.
 
 ## 6. Điều tra challenge
 
