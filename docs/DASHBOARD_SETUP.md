@@ -4,6 +4,8 @@
 
 Kết quả audit event/field ở CP1 được ghi tại
 [CP1_DASHBOARD_LOG_AUDIT.md](CP1_DASHBOARD_LOG_AUDIT.md).
+Phần triển khai và evidence runtime ở CP2 được ghi tại
+[CP2_METRICS_DASHBOARD.md](CP2_METRICS_DASHBOARD.md).
 
 Trường `query` trong YAML là pseudocode mô tả phép tính, không phải câu lệnh để copy nguyên vào mọi công cụ. Nhóm chuyển cùng logic đó sang cú pháp của công cụ đã chọn.
 
@@ -24,7 +26,9 @@ Giữ time range mặc định 60 phút, refresh 30 giây và hiển thị thres
 
 1. Hoàn thiện logging/PII và chạy API.
 2. Chạy `python scripts/load_test.py --concurrency 5` để tạo baseline.
-3. Dùng `data/logs.jsonl` làm nguồn chuẩn để tạo đúng sáu panel bằng Streamlit, notebook, Grafana hoặc công cụ tương đương. Langfuse vẫn là nơi mở trace/prompt version để điều tra sâu.
+3. Mở `http://127.0.0.1:8000/dashboard`. Dashboard runtime đọc
+   `data/logs.jsonl` và dựng đúng sáu panel; Langfuse vẫn là nơi mở
+   trace/prompt version để điều tra sâu.
 4. Đặt tên panel, đơn vị và threshold giống contract.
 5. Chạy validator:
 
@@ -33,6 +37,9 @@ python scripts/validate_dashboard.py
 ```
 
 Validator kiểm tra cấu trúc contract; nó không thể chứng minh biểu đồ trong ảnh dùng đúng dữ liệu. Evidence runtime vẫn bắt buộc.
+
+Dashboard mặc định dùng cửa sổ 60 phút và tự tải lại sau 30 giây theo contract.
+Nếu panel hiện `No data`, hãy chạy load test rồi refresh trang.
 
 ## Cách kiểm tra runtime
 
