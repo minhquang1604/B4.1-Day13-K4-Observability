@@ -1,0 +1,203 @@
+# CP3 — điều tra challenge bằng correlation ID (role A: Nghĩa)
+# Challenge: day13-k4-observability-v1 | Cohort K4 | incident=rag_slow
+#            affected_feature=monitoring | latency_threshold_ms=2000
+# Thời điểm: 2026-08-11
+# Phạm vi file này: tầng LOG. Metrics là phần của Bách, mitigation là phần của Hùng.
+
+===============================================================================
+1. TRÌNH TỰ CHẠY (tái lập được)
+===============================================================================
+
+rm -f data/logs.jsonl
+uvicorn app.main:app --env-file .env          # khởi động sạch
+
+# (a) BASELINE — 5 query challenge, gửi tuần tự, hệ thống khỏe
+# (b) CHALLENGE CHÍNH THỨC:
+python scripts/inject_incident.py             # -> rag_slow: True
+python scripts/load_test.py --challenge --concurrency 5
+# (c) CONTROL — tắt incident, chạy lại đúng 5 query đó với concurrency 5
+python scripts/inject_incident.py --disable
+
+Bước (c) là bước tách biến: nó chứng minh triệu chứng #2 dưới đây tồn tại
+độc lập với incident được inject.
+
+===============================================================================
+2. TRIỆU CHỨNG TỪ METRICS (điểm vào của chuỗi)
+===============================================================================
+
+GET /metrics sau toàn bộ 15 request:
+{
+  "traffic": 15,
+  "latency_p50": 1090.0,
+  "latency_p95": 3626.0,
+  "latency_p99": 3626.0,
+  "error_breakdown": {},
+  "quality_avg": 0.84
+}
+
+p95 = 3626ms, vượt ngưỡng challenge 2000ms 1.8 lần. Không có error:
+đây là sự cố thuần latency, không phải sự cố lỗi.
+
+===============================================================================
+3. TRIỆU CHỨNG #1 — LATENCY MỖI REQUEST TĂNG 3.3 LẦN
+===============================================================================
+
+Đo server-side (field latency_ms trong log response_sent):
+
+BASELINE (khỏe, tuần tự)          INCIDENT (rag_slow, concurrency 5)
+  08:22:38.104 req-fe0aa1a7 1100ms  08:22:53.009 req-118dba02 3626ms
+  08:22:39.165 req-0e971069 1055ms  08:22:56.574 req-a410d740 3562ms
+  08:22:40.250 req-0bc3b0eb 1079ms  08:23:00.118 req-cc4200aa 3540ms
+  08:22:41.305 req-9107368c 1050ms  08:23:03.662 req-511e88f7 3540ms
+  08:22:42.397 req-181cac0a 1085ms  08:23:07.269 req-69d736af 3602ms
+  p50=1079ms p95=1100ms             p50=3562ms p95=3626ms
+
+Chênh lệch 3626 - 1100 = 2526ms, khớp gần như tuyệt đối với
+time.sleep(2.5) trong app/mock_rag.py:17-18:
+
+    if STATE["rag_slow"]:
+        time.sleep(2.5)
+
+===============================================================================
+4. TRIỆU CHỨNG #2 — ZERO CONCURRENCY (nghiêm trọng hơn, có sẵn từ trước)
+===============================================================================
+
+Client báo 17.9s trong khi server-side chỉ 3.6s. Khoảng cách 14s đó không
+nằm trong bất kỳ request nào — nó là thời gian XẾP HÀNG.
+
+Bằng chứng quyết định: 5 request được gửi ĐỒNG THỜI lúc ~08:22:49, nhưng
+dòng request_received — câu log ĐẦU TIÊN bên trong handler — lại cách nhau
+3.6 giây:
+
+  request_received  08:22:49.380  req-118dba02
+  request_received  08:22:53.010  req-a410d740     <- +3.63s
+  request_received  08:22:56.576  req-cc4200aa     <- +3.57s
+  request_received  08:23:00.119  req-511e88f7     <- +3.54s
+  request_received  08:23:03.664  req-69d736af     <- +3.55s
+
+Request thứ 2 chưa hề VÀO được handler cho tới khi request 1 kết thúc hoàn
+toàn. Đây không phải retrieval chậm — đây là event loop bị chặn.
+
+CONTROL chứng minh nó không do incident gây ra (hệ thống khỏe, concurrency 5):
+  08:24:04.215 req-9bc80867 1090ms
+  08:24:05.328 req-41d88302 1109ms   <- cách nhau đúng ~1.07s
+  08:24:06.388 req-bd1aa1e9 1055ms
+  08:24:07.476 req-d7d4db03 1082ms
+  08:24:08.525 req-aa2ff32b 1046ms
+  wall clock 5.5s = TỔNG các latency, không phải MAX.
+
+Kết luận: throughput của endpoint là 1 request tại một thời điểm, bất kể
+có incident hay không. Incident không tạo ra lỗi này, nó nhân lỗi này lên
+3.3 lần: 5 x 1.08s = 5.5s trở thành 5 x 3.58s = 17.9s.
+
+===============================================================================
+5. TRIỆU CHỨNG #3 — 86% LATENCY LÚC KHỎE LÀ MỘT CÚ GỌI MẠNG THẤT BẠI
+===============================================================================
+
+Baseline 1.08s không được giải thích bởi FakeLLM (chỉ sleep 0.15s).
+Đo phân rã từng stage, lặp 3 lần:
+
+  lần 1: retrieve=  0.0ms  resolve_prompt=981.7ms  llm=150.1ms  source=local-fallback
+  lần 2: retrieve=  0.0ms  resolve_prompt=903.2ms  llm=150.2ms  source=local-fallback
+  lần 3: retrieve=  0.0ms  resolve_prompt=937.2ms  llm=150.1ms  source=local-fallback
+
+~930ms/request là vòng round-trip tới Langfuse để lấy prompt "day13-chat"
+label "production" — prompt KHÔNG TỒN TẠI, trả 404, và kết quả thất bại
+KHÔNG được cache (cache_ttl_seconds=60 chỉ cache lần fetch thành công).
+Mỗi request đều trả giá lại từ đầu.
+
+  Error while fetching prompt 'day13-chat-label:production': status_code: 404,
+  body: {'message': "Prompt not found: 'day13-chat' with label 'production'"}
+
+Ngân sách latency đầy đủ:
+  khỏe    1.08s = resolve_prompt 0.93s + llm 0.15s + retrieve 0.00s
+  sự cố   3.58s = resolve_prompt 0.93s + llm 0.15s + retrieve 2.50s
+
+===============================================================================
+6. TRUY VẾT BẰNG CORRELATION ID (phần việc role A)
+===============================================================================
+
+# B1. tìm request chậm nhất, kèm sẵn trace_id
+jq -c 'select(.event=="response_sent") | {cid:.correlation_id, ms:.latency_ms, trace:.trace_id}' \
+  data/logs.jsonl | jq -s 'sort_by(-.ms)[:3]'
+
+[
+  {"cid": "req-118dba02", "ms": 3626, "trace": "f466827e8b9e5f8403a2ef67ac40bde1"},
+  {"cid": "req-69d736af", "ms": 3602, "trace": "87994bf795fb5fa36a2704dc9c2283e9"},
+  {"cid": "req-a410d740", "ms": 3562, "trace": "cd704c2767f3ea5bffbcdde2197fdea8"}
+]
+
+# B2. toàn bộ vòng đời của request chậm nhất
+jq -c 'select(.correlation_id=="req-118dba02")' data/logs.jsonl
+
+{"service":"api","payload":{"message_preview":"Explain why metrics traces and logs work together."},
+ "event":"request_received","model":"claude-sonnet-4-5","session_id":"k4-challenge-s01",
+ "feature":"monitoring","env":"dev","correlation_id":"req-118dba02",
+ "user_id_hash":"f00ba60b3772","level":"info","ts":"2026-08-11T08:22:49.380777Z"}
+{"service":"api","trace_id":"f466827e8b9e5f8403a2ef67ac40bde1","latency_ms":3626,
+ "tokens_in":35,"tokens_out":90,"cost_usd":0.001455,"quality_score":0.8,
+ "event":"response_sent","model":"claude-sonnet-4-5","session_id":"k4-challenge-s01",
+ "feature":"monitoring","env":"dev","correlation_id":"req-118dba02",
+ "user_id_hash":"f00ba60b3772","level":"info","ts":"2026-08-11T08:22:53.009024Z"}
+
+# B3. trace ID để mở Langfuse (chuỗi Logs -> Traces khép kín)
+jq -r 'select(.correlation_id=="req-118dba02" and .trace_id!=null) | .trace_id' data/logs.jsonl
+f466827e8b9e5f8403a2ef67ac40bde1
+
+# B4. tìm request lỗi (không có trong lần chạy này — error_breakdown rỗng)
+jq -c 'select(.event=="request_failed") | {cid:.correlation_id, err:.error_type}' data/logs.jsonl
+
+Lưu ý PII: user_id gốc "k4-u01" không xuất hiện, chỉ có user_id_hash
+"f00ba60b3772". Evidence này an toàn để commit.
+
+===============================================================================
+7. ROOT CAUSE
+===============================================================================
+
+Trực tiếp (được inject):
+  retrieve() trong app/mock_rag.py chặn 2.5s khi cờ rag_slow bật.
+  => p95 1100ms -> 3626ms, vượt ngưỡng SLO 2000ms.
+
+Cấu trúc (có sẵn, incident chỉ phơi bày):
+  app/main.py khai báo `async def chat(...)` nhưng gọi thẳng agent.run(),
+  một hàm ĐỒNG BỘ chứa time.sleep(). Blocking call chạy trực tiếp trên
+  event loop thread nên toàn bộ loop đứng lại; không request nào khác được
+  phục vụ. Throughput = 1 request/lần, wall clock = tổng latency.
+
+Lãng phí (độc lập):
+  resolve_prompt() trả giá ~930ms mỗi request cho một lần fetch 404 không
+  được cache, vì prompt "day13-chat" chưa được tạo trên Langfuse.
+
+===============================================================================
+8. ĐỀ XUẤT — input bàn giao cho Hùng (SRE) và QA, KHÔNG phải quyết định của role A
+===============================================================================
+
+Fix ngay:
+  - Tắt cờ rag_slow (đã tắt ở bước control). Với hệ thống thật: đặt timeout
+    cho vector store và fail fast thay vì chờ vô hạn.
+  - Tạo prompt "day13-chat" + label "production" trên Langfuse: cắt ~930ms
+    (86%) latency lúc khỏe mạnh mà không đụng một dòng code nào.
+
+Fix cấu trúc:
+  - Đưa công việc blocking ra khỏi event loop: đổi `async def chat` thành
+    `def chat` (FastAPI tự chạy trong threadpool), hoặc bọc agent.run bằng
+    starlette.concurrency.run_in_threadpool / asyncio.to_thread.
+    Đây là fix có tác động lớn nhất: nó bỏ hoàn toàn phần xếp hàng 14s.
+  - Cache cả kết quả fetch prompt thất bại (negative caching).
+
+Phòng ngừa:
+  - Alert trên p95 latency theo ngưỡng SLO 2000ms (đã có trong
+    config/alert_rules.yaml của Hùng — cần đối chiếu).
+  - Alert trên KHOẢNG CÁCH giữa latency client và latency server. Chính
+    khoảng cách này phơi bày việc xếp hàng, mà p95 server-side hoàn toàn
+    che giấu: server-side p95 chỉ 3.6s trong khi user thật chờ 17.9s.
+  - Load test có concurrency trong CI, không chỉ chạy tuần tự. Toàn bộ
+    triệu chứng #2 vô hình nếu chỉ test tuần tự.
+
+===============================================================================
+9. TRẠNG THÁI HIỆN TẠI
+===============================================================================
+
+incidents: {"rag_slow": false, "tool_fail": false, "cost_spike": false}
+Incident đã được tắt sau bước control. data/logs.jsonl chứa đủ 15 request
+của cả ba lần chạy (baseline / incident / control) theo đúng thứ tự trên.
