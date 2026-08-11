@@ -1,19 +1,19 @@
 alerts:
-  - name: TODO_alert_1
-    severity: TODO
-    condition: TODO
+  - name: ai-api-tail-latency-slo-breach
+    severity: critical
+    condition: P95(response_sent.latency_ms) > 3000 ms for 10 minutes
     type: symptom-based
-    owner: TODO
+    owner: Hùng (SRE)
     runbook: docs/alerts.md#alert-1
-  - name: TODO_alert_2
-    severity: TODO
-    condition: TODO
+  - name: ai-api-error-rate-slo-breach
+    severity: critical
+    condition: count(request_failed) / count(request_received) * 100 > 2% for 5 minutes
     type: symptom-based
-    owner: TODO
+    owner: Hùng (SRE)
     runbook: docs/alerts.md#alert-2
-  - name: TODO_alert_3
-    severity: TODO
-    condition: TODO
+  - name: ai-api-daily-cost-budget-breach
+    severity: warning
+    condition: sum(response_sent.cost_usd) > 2.5 USD in a rolling 24-hour window
     type: symptom-based
-    owner: TODO
+    owner: Hùng (SRE)
     runbook: docs/alerts.md#alert-3

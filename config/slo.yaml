@@ -4,13 +4,15 @@ slis:
   latency_p95_ms:
     objective: 3000
     target: 99.5
-    note: Replace with your group's target
+    note: P95 response latency must remain at or below 3000 ms over the 28-day window.
   error_rate_pct:
     objective: 2
     target: 99.0
   daily_cost_usd:
     objective: 2.5
     target: 100.0
+    note: Daily generated-response cost must remain at or below 2.5 USD.
   quality_score_avg:
     objective: 0.75
     target: 95.0
+    note: Heuristic quality average must remain at or above 0.75.
