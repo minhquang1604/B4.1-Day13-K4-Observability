@@ -6,6 +6,12 @@
 - Repository URL:
 - Commit SHA cuối:
 - Thành viên và vai trò:
+- Điền Mạnh Hùng - 2A202601888 -
+- Nguyễn Lâm Tùng Bách - 2A202601830 -
+- Trần Phú Nghĩa - 2A20260233871 -
+- Cao Minh Quang - 2A202601884 -
+- Trần Minh Quang - 2A202601856 - Thành viên E (QA & Chief Investigator): Chạy load test, bọc trace cho sub-component RAG/LLM (phần mở rộng), dẫn dắt điều tra Challenge (CP3) và hoàn thiện báo cáo nhóm.
+
 
 ## 2. Kết quả kỹ thuật
 
