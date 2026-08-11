@@ -1,0 +1,109 @@
+# CP2 — nối request → log → trace (role A: Nghĩa)
+# Thay đổi: app/agent.py, app/tracing.py, app/main.py,
+#           config/logging_schema.json, tests/test_trace_correlation.py
+# Chạy trên main sau khi merge CP1 của cả 4 thành viên.
+# Thời điểm: 2026-08-11
+
+## Cơ chế liên kết hai chiều
+
+log -> trace : mỗi log "response_sent" mang field trace_id, dán thẳng vào Langfuse.
+trace -> log : generation metadata mang correlation_id, grep ngược ra log của request.
+
+Vì sao correlation_id nằm ở generation metadata chứ không phải trace metadata:
+test công khai của Lab Coach (tests/test_agent_prompt_trace.py:52) khóa cứng
+trace metadata == đúng 4 key prompt_name/prompt_label/prompt_version/prompt_source.
+Thêm key vào đó sẽ làm hỏng test của giám khảo, nên đặt ở generation —
+vẫn hiện đầy đủ khi mở span trong trace waterfall.
+
+## 1. /health — tracing đã bật thật
+
+{"ok":true,"tracing_enabled":true,"incidents":{"rag_slow":false,"tool_fail":false,"cost_spike":false}}
+
+## 2. Log record có cả correlation_id và trace_id
+
+$ curl -X POST http://127.0.0.1:8000/chat -H 'x-request-id: req-cafe1234' ...
+
+{
+  "service": "api",
+  "trace_id": "b5441568099a53cbd4e92534ca2b35d6",
+  "latency_ms": 1072,
+  "tokens_in": 24,
+  "tokens_out": 111,
+  "cost_usd": 0.001737,
+  "quality_score": 0.9,
+  "payload": {"answer_preview": "Starter answer. Teams should improve this output logic and add better quality ch..."},
+  "event": "response_sent",
+  "feature": "qa",
+  "correlation_id": "req-cafe1234",
+  "model": "claude-sonnet-4-5",
+  "session_id": "s1",
+  "user_id_hash": "bb82030dbc2b",
+  "env": "dev",
+  "level": "info",
+  "ts": "2026-08-11T08:12:36.220364Z"
+}
+
+## 3. Ghép đôi 1-1 trên toàn bộ log
+
+$ python scripts/load_test.py
+response_sent records: 11
+co trace_id: 11
+co correlation_id: 11
+trace_id duy nhat: 11
+correlation_id duy nhat: 11
+
+cid -> trace_id:
+  req-cafe1234 -> b5441568099a53cbd4e92534ca2b35d6
+  req-c1e533cb -> dbd2b5c836df2ca21b7a9b4f2b1e1d10
+  req-b4bf993e -> 0abac29826e682d305034132521ba22e
+  req-e5dfb4a3 -> 6ece5e7df8127212c21e5619f11ff295
+  req-7c69bc18 -> a8b763fbf0d93b8b7ddaaad4f1fd2954
+
+## 4. Cách tra ngược khi điều tra (dùng ở CP3)
+
+# tu log ra trace
+jq -r 'select(.correlation_id=="req-cafe1234") | .trace_id' data/logs.jsonl
+# tu trace ra toan bo vong doi request
+jq -c 'select(.trace_id=="b5441568099a53cbd4e92534ca2b35d6")' data/logs.jsonl
+# request cham nhat kem trace_id de mo Langfuse
+jq -c 'select(.event=="response_sent") | {correlation_id,trace_id,latency_ms}' data/logs.jsonl \
+  | jq -s 'sort_by(-.latency_ms)[:5]'
+
+## 5. Kiểm tra không hồi quy
+
+$ python -m pytest -q
+35 passed, 2 warnings
+(32 sau merge CP1 + 3 test mới trong tests/test_trace_correlation.py)
+
+$ python scripts/validate_dashboard.py
+HỢP LỆ: 6/6 panel có trong dashboard contract; 7/7 field có trong logging schema.
+
+$ python scripts/validate_logs.py
+Records with missing required fields: 0
+Records with missing enrichment (context): 0
+Unique correlation IDs found: 11
+Potential PII leaks detected: 0
+Estimated Score: 100/100
+
+## 6. Test mới (tests/test_trace_correlation.py)
+
+- generation metadata mang đúng correlation_id của request
+- log response_sent mang đúng trace_id, và khớp correlation_id ở response header
+- Langfuse hỏng (get_current_trace_id ném exception) thì request vẫn 200:
+  lỗi ở tầng quan sát không được phép làm chết request nó đang quan sát
+
+## Bàn giao cho người làm prompt versioning (KHÔNG thuộc scope role A)
+
+Langfuse kết nối được, nhưng prompt chưa được tạo trên project:
+
+  Error while fetching prompt 'day13-chat-label:production': status_code: 404,
+  body: {'message': "Prompt not found: 'day13-chat' with label 'production'",
+         'error': 'LangfuseNotFoundError'}
+  Returning fallback prompt ... due to fetch error
+
+Hệ quả: trace hiện ghi prompt_source=local-fallback, prompt_version=local-v1.
+Phải tạo prompt "day13-chat" v1/v2 và gắn label "production" trên Langfuse thì
+CP2 mới có evidence prompt version thật (xem docs/PROMPT_VERSIONING.md).
+
+Ngoài ra LANGFUSE_HOST trong .env đang để trống; SDK tự fallback về
+https://cloud.langfuse.com nên vẫn chạy, nhưng nên điền tường minh.

@@ -23,12 +23,30 @@ except ImportError:  # pragma: no cover - chỉ dùng khi chưa cài requirement
         def update_current_generation(self, **kwargs: Any) -> None:
             return None
 
+        def get_current_trace_id(self) -> str | None:
+            return None
+
     def get_client():
         return _DummyClient()
 
 
 def get_langfuse_client():
     return get_client()
+
+
+def current_trace_id(client: Any) -> str | None:
+    """Trace id of the active span, or None when tracing is off.
+
+    Logging the id is what makes a log line clickable back to its trace, so a
+    tracing hiccup must never break the request it was meant to describe.
+    """
+    getter = getattr(client, "get_current_trace_id", None)
+    if getter is None:
+        return None
+    try:
+        return getter()
+    except Exception:
+        return None
 
 
 def tracing_enabled() -> bool:
