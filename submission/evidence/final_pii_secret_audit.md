@@ -15,13 +15,15 @@
    code chứa PII giả). Đã regenerate với `.venv` active và viết lại notes
    không chép nguyên văn giá trị test.
 6. Chạy lại toàn bộ để xác nhận trạng thái cuối cùng đúng:
-   - `pytest -q`: 40/40 passed.
-   - `scripts/validate_logs.py`: PII scrubbing = PASSED, Correlation ID = PASSED.
+   - `pytest -q`: 43/43 passed.
+   - `scripts/validate_logs.py`: 100/100; 20 records, 10 correlation IDs,
+     không thiếu schema/enrichment và 0 PII leak.
+   - `scripts/validate_dashboard.py`: hợp lệ 6/6 panel và 7/7 logging field.
 
 ## Kết luận
-Nhánh `minhquang1604` (phần đóng góp của Quang) sẵn sàng để push — không có
-secret, không có PII nguyên văn (kể cả PII thử nghiệm) trong bất kỳ file nào
-đang được track bởi git.
+Bản tích hợp cuối của nhóm B4.1 sẵn sàng để review trước push — không có secret,
+không có PII nguyên văn (kể cả PII thử nghiệm) trong bất kỳ file nào đang được
+track bởi Git.
 
 ## Bài học rút ra (để note vào REPORT.md phần cá nhân)
 Môi trường Bash trong phiên làm việc này KHÔNG giữ lại trạng thái
