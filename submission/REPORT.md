@@ -4,7 +4,7 @@
 
 - Tên nhóm: **B4.1**.
 - Repository URL: [K4-DAY13-2A202601884](https://github.com/minhquang1604/K4-DAY13-2A202601884.git).
-- Commit SHA cuối: `5bc606a` tại thời điểm hoàn thiện report; cập nhật lại bằng `git rev-parse --short HEAD` sau commit report cuối.
+- Commit SHA cuối: 02cf21a612985d4a3052025cffe0669131ba9814.
 - Thành viên và vai trò:
   - Điền Mạnh Hùng — `2A202601888`: SRE, SLO, alert và runbook.
   - Nguyễn Lâm Tùng Bách — `2A202601830`: metrics và dashboard.
