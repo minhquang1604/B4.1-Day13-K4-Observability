@@ -6,6 +6,12 @@
 - Repository URL:
 - Commit SHA cuối:
 - Thành viên và vai trò:
+- Điền Mạnh Hùng - 2A202601888 -
+- Nguyễn Lâm Tùng Bách - 2A202601830 -
+- Trần Phú Nghĩa - 2A20260233871 -
+- Cao Minh Quang - 2A202601884 -
+- Trần Minh Quang - 2A202601856 - Thành viên E (QA & Chief Investigator): Chạy load test, bọc trace cho sub-component RAG/LLM (phần mở rộng), dẫn dắt điều tra Challenge (CP3) và hoàn thiện báo cáo nhóm.
+
 
 ## 2. Kết quả kỹ thuật
 
@@ -70,6 +76,12 @@ Mục tiêu SLO đã được giữ theo contract: P95 latency ≤ 3000 ms, erro
 - SLO đã chọn và lý do: P95 latency ≤ 3000 ms, error rate ≤ 2%, daily cost ≤ 2.5 USD và quality trung bình ≥ 0.75, khớp với dashboard contract để một tín hiệu có thể được phát hiện và điều tra bằng cùng dữ liệu log.
 - Alert rules và runbook: [config/alert_rules.yaml](../config/alert_rules.yaml) và [docs/alerts.md](../docs/alerts.md) — alert tail latency, error rate và daily cost; mỗi alert có severity, owner Hùng (SRE), condition, triage Metrics → Traces → Logs và mitigation tạm thời.
 
+### CP4 SRE handoff (Hùng)
+
+- Kiểm tra cuối: `python scripts/validate_dashboard.py` hợp lệ 6/6 panel và 7/7 logging fields; `python -m pytest -q` có 43 tests passed.
+- Demo SRE: mở panel Latency để chỉ ra P95 vượt ngưỡng, mở trace của request chậm để so sánh `rag_retrieve` với `llm_generate`, sau đó dùng `correlation_id` tìm log tương ứng và đọc mitigation trong Alert 1.
+- Evidence còn cần chụp trước khi nộp: trace waterfall của code đã merge, với Langfuse kết nối thành công và correlation ID hợp lệ.
+
 ## 6. Điều tra challenge
 
 - Challenge ID: `day13-k4-observability-v1` (cohort K4, incident `rag_slow`, `affected_feature=monitoring`, `latency_threshold_ms=2000`, xem `config/challenge.json`).
@@ -98,3 +110,5 @@ Với mỗi thành viên, ghi rõ nhiệm vụ và link commit/PR tương ứng.
 |---|---|---|---|
 | E (QA & Chief Investigator) | Chạy load test practice và challenge (`scripts/load_test.py`); bọc trace `rag_retrieve`/`llm_generate` cho sub-component RAG/LLM (`app/mock_rag.py`, `app/mock_llm.py`); điều tra CP3 (`config/challenge.json`) và viết mục 6 báo cáo | *(điền commit SHA sau khi commit)* | Blocking call trong `async def` FastAPI handler chặn cả event loop và khuếch đại tail latency dưới tải đồng thời — phải phân biệt `latency_ms` nội bộ với latency client thấy được (queue wait) khi điều tra incident. |
 | A — Nghĩa (Middleware) | Correlation ID middleware: clear contextvars, validate/sinh `req-<8 hex>`, response header `x-request-id` + `x-response-time-ms` ([app/middleware.py](../app/middleware.py)); enrich log context `user_id_hash`/`session_id`/`feature`/`model`/`env` ([app/main.py](../app/main.py)); liên kết hai chiều log ↔ trace ([app/agent.py](../app/agent.py), [app/tracing.py](../app/tracing.py)); 8 test mới ([tests/test_middleware_correlation.py](../tests/test_middleware_correlation.py), [tests/test_trace_correlation.py](../tests/test_trace_correlation.py)); điều tra tầng log ở CP3 | PR #3, #5 (CP1), PR #9 (CP2), PR CP3 — nhánh `feat/nghia-*` | Correlation ID không chỉ để tra cứu: chính **timestamp của `request_received`** đã chứng minh event loop bị chặn — 5 request gửi đồng thời nhưng vào handler cách nhau 3.6s. Metric p95 server-side che giấu hoàn toàn triệu chứng này (3.6s so với 17.9s người dùng thật chờ). Log trả lời được câu hỏi mà metric không đặt ra. |
+| Hùng (SRE/Alerts) | SLO, 3 alert symptom-based, runbook, SRE acceptance gate và evidence incident `rag_slow` | `100c39a`, `ef46424`, `779f16f` | Điều tra phải nối metrics → trace → log bằng correlation ID; latency tổng cần tách với queue wait để chọn đúng mitigation. |
+| | | | |
