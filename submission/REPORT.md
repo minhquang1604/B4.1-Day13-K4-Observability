@@ -24,10 +24,24 @@
 
 ## 3. Logging và tracing
 
-- Evidence correlation ID:
-- Evidence PII redaction:
+- Evidence correlation ID: [cp1-correlation-id-after.txt](evidence/cp1-correlation-id-after.txt) (header round-trip, 0 rò context ở `--concurrency 5`, validator 30/100 → 100/100) và [cp2-log-trace-correlation.txt](evidence/cp2-log-trace-correlation.txt) (11/11 record ghép 1-1 `correlation_id` ↔ `trace_id`).
+- Evidence PII redaction: [cp1_pii_redaction_notes.md](evidence/cp1_pii_redaction_notes.md), [cp1_pii_redaction_logs.jsonl](evidence/cp1_pii_redaction_logs.jsonl).
 - Evidence trace waterfall:
 - Giải thích một span đáng chú ý:
+
+### Middleware và correlation ID (Nghĩa)
+
+Ba cơ chế trong [app/middleware.py](../app/middleware.py) và [app/main.py](../app/main.py):
+
+1. `clear_contextvars()` chạy đầu mỗi request. Contextvars sống sót giữa các request trên cùng worker task, không xóa thì context request trước rò sang request sau — chỉ lộ ra khi chạy đồng thời.
+2. Header `x-request-id` chỉ được tái sử dụng khi khớp `^req-[0-9a-f]{8}$`, sai thì sinh mới. Header do client kiểm soát; nhận nguyên xi thì giá trị đó đi vào mọi dòng log của request, thành log injection và nổ cardinality khi query. Đánh đổi có ý thức: correlation ID từ service upstream khác định dạng sẽ bị bỏ.
+3. Liên kết hai chiều log ↔ trace: log `response_sent` mang `trace_id` (mở thẳng Langfuse từ log), generation metadata mang `correlation_id` (grep ngược ra log từ trace). `correlation_id` đặt ở **generation** chứ không phải trace metadata vì test công khai [tests/test_agent_prompt_trace.py](../tests/test_agent_prompt_trace.py) khóa cứng trace metadata bằng đúng 4 key prompt — không sửa test của Lab Coach để code mình pass.
+
+`current_trace_id()` nuốt exception và trả `None`: Langfuse hỏng không được phép làm chết request mà nó đang quan sát. Có test riêng cho trường hợp này.
+
+**Giới hạn đã biết — liên quan trực tiếp tới preventive measure #1 ở mục 6.** Header `x-response-time-ms` và field `latency_ms` **không thể** đo được queue wait, và metric `queue_wait_ms` cũng không cài đặt được trong middleware này. Lý do: khi event loop bị chặn, `dispatch()` của middleware chưa hề bắt đầu chạy, nên mốc `start` được ghi *sau* khi đã xếp hàng xong. Đó chính là vì sao `latency_ms` server-side báo 3.6s trong khi client chờ 17.9s. Muốn đo queue wait phải lấy mốc ở tầng ASGI server hoặc đối chiếu timestamp do client gửi kèm, không phải ở middleware ứng dụng.
+
+Rà soát cuối trên bản đã merge cả 4 thành viên (commit `78805cf`): `pytest` 43 passed; `validate_dashboard.py` 6/6 panel, 7/7 field; smoke test một request có PII trả header `x-request-id: req-11223344` + `x-response-time-ms: 1202.93`, log ghi đủ `correlation_id`/`trace_id`/enrichment và che `[REDACTED_EMAIL]`, `[REDACTED_PHONE_VN]`, `grep` không thấy email/số điện thoại nguyên văn.
 
 ### SRE acceptance gate — CP1 (Hùng)
 
@@ -83,4 +97,4 @@ Với mỗi thành viên, ghi rõ nhiệm vụ và link commit/PR tương ứng.
 | Thành viên | Phần việc | Commit/PR | Điều đã học |
 |---|---|---|---|
 | E (QA & Chief Investigator) | Chạy load test practice và challenge (`scripts/load_test.py`); bọc trace `rag_retrieve`/`llm_generate` cho sub-component RAG/LLM (`app/mock_rag.py`, `app/mock_llm.py`); điều tra CP3 (`config/challenge.json`) và viết mục 6 báo cáo | *(điền commit SHA sau khi commit)* | Blocking call trong `async def` FastAPI handler chặn cả event loop và khuếch đại tail latency dưới tải đồng thời — phải phân biệt `latency_ms` nội bộ với latency client thấy được (queue wait) khi điều tra incident. |
-| | | | |
+| A — Nghĩa (Middleware) | Correlation ID middleware: clear contextvars, validate/sinh `req-<8 hex>`, response header `x-request-id` + `x-response-time-ms` ([app/middleware.py](../app/middleware.py)); enrich log context `user_id_hash`/`session_id`/`feature`/`model`/`env` ([app/main.py](../app/main.py)); liên kết hai chiều log ↔ trace ([app/agent.py](../app/agent.py), [app/tracing.py](../app/tracing.py)); 8 test mới ([tests/test_middleware_correlation.py](../tests/test_middleware_correlation.py), [tests/test_trace_correlation.py](../tests/test_trace_correlation.py)); điều tra tầng log ở CP3 | PR #3, #5 (CP1), PR #9 (CP2), PR CP3 — nhánh `feat/nghia-*` | Correlation ID không chỉ để tra cứu: chính **timestamp của `request_received`** đã chứng minh event loop bị chặn — 5 request gửi đồng thời nhưng vào handler cách nhau 3.6s. Metric p95 server-side che giấu hoàn toàn triệu chứng này (3.6s so với 17.9s người dùng thật chờ). Log trả lời được câu hỏi mà metric không đặt ra. |
