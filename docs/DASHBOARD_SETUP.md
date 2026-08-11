@@ -6,6 +6,8 @@ Kết quả audit event/field ở CP1 được ghi tại
 [CP1_DASHBOARD_LOG_AUDIT.md](CP1_DASHBOARD_LOG_AUDIT.md).
 Phần triển khai và evidence runtime ở CP2 được ghi tại
 [CP2_METRICS_DASHBOARD.md](CP2_METRICS_DASHBOARD.md).
+Kết quả đọc metrics của challenge ở CP3 được ghi tại
+[CP3_METRICS_FINDINGS.md](CP3_METRICS_FINDINGS.md).
 
 Trường `query` trong YAML là pseudocode mô tả phép tính, không phải câu lệnh để copy nguyên vào mọi công cụ. Nhóm chuyển cùng logic đó sang cú pháp của công cụ đã chọn.
 

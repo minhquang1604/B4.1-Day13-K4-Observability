@@ -1,0 +1,30 @@
+CP3 METRICS EVIDENCE
+Challenge: day13-k4-observability-v1
+Scenario: rag_slow
+Affected feature: monitoring
+Scope: incident phase markers (feature metadata unavailable)
+
+BASELINE
+- Requests/responses: 5/5
+- Latency P50/P95/P99: 150/151/151 ms
+- Error rate: 0.00%
+- Cost: $0.011985
+
+INCIDENT
+- Requests/responses: 5/5
+- Latency P50/P95/P99: 2651/2651/2651 ms
+- Error rate: 0.00%
+- Cost: $0.009705
+
+COMPARISON
+- P95 delta: +2500 ms (17.56x)
+- Challenge threshold: 2000 ms
+- Threshold breached: true
+- Symptom: Tail latency regression
+- Incident marker: 2026-08-11T08:25:23.835315Z
+- First affected response: 2026-08-11T08:25:26.963035Z
+- Last affected response: 2026-08-11T08:25:37.582185Z
+- Incident disabled: 2026-08-11T08:25:38.042094Z
+
+BOUNDARY
+Metrics establish the symptom and affected time window only. Use traces to localize the abnormal span and logs to prove root cause.
