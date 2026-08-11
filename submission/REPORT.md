@@ -58,13 +58,15 @@ Mục tiêu SLO đã được giữ theo contract: P95 latency ≤ 3000 ms, erro
 
 ## 6. Điều tra challenge
 
-- Challenge ID:
-- Triệu chứng từ metrics:
-- Trace ID liên quan:
-- Log line/correlation ID liên quan:
-- Root cause:
-- Fix action:
-- Preventive measure:
+- Challenge ID: `day13-k4-observability-v1` — incident `rag_slow`, affected feature `monitoring`.
+- Triệu chứng từ metrics: Sau 5 request chính thức (concurrency 5), P50 = 3471 ms và P95/P99 = 3481 ms; vượt SLO 3000 ms và challenge threshold 2000 ms. Error rate = 0%, total cost = 0.0102 USD, quality average = 0.84.
+- Trace ID liên quan: `7bc2c339e500086c3e0f504cf3d15458`, latency 3.483 s; observation `GENERATION/run` `ad43459ef63fa57b` dài 3.483 s.
+- Log line/correlation ID liên quan: `response_sent` tại `2026-08-11T08:10:20.083058Z`, `latency_ms=3481`, sau request `2026-08-11T08:10:16.599225Z`. Correlation ID hiện là `MISSING`; đây là gap CP1 cần xử lý trước demo.
+- Root cause: `retrieve()` gọi blocking `time.sleep(2.5)` khi incident `rag_slow` bật ([mock_rag.py](../app/mock_rag.py)), nằm trên request path async và làm tăng tail latency/giảm concurrency.
+- Fix action: dùng retrieval async hoặc thread pool cho dependency sync, đặt timeout và fallback an toàn khi retrieval quá latency budget.
+- Preventive measure: instrument span `retrieval` riêng, giữ generation span chỉ cho LLM; alert P95 latency triage qua trace/log có correlation ID hợp lệ; thêm concurrency test cho `rag_slow` vào release check.
+
+Evidence chi tiết: [CP3 rag_slow investigation](evidence/cp3-rag-slow-investigation.md).
 
 ## 7. Đóng góp cá nhân
 
