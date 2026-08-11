@@ -1,10 +1,15 @@
 # CP0 — PII baseline (Quang)
 
 ## Sample queries có PII (data/sample_queries.jsonl)
-- u01: email `student@vinuni.edu.vn`
-- u05: phone VN `0987654321`
-- u09: credit card `4111 1111 1111 1111`
+- u01: email dạng `student@***` (domain trường)
+- u05: số điện thoại VN test, dạng `09xx-***-***`
+- u09: số thẻ test, dạng `4111 **** **** ****` (mẫu thẻ test chuẩn Visa)
 - Thiếu ca CCCD (12 số) — cần bổ sung test thủ công ở CP1.
+
+Ghi chú: không chép nguyên văn giá trị test vào evidence, kể cả khi đó là
+PII giả — theo checkpoint 1 (RULES.md), PII thử nghiệm cũng không được xuất
+hiện nguyên văn. Giá trị gốc xem trực tiếp trong `data/sample_queries.jsonl`
+khi cần đối chiếu.
 
 ## Kết quả baseline
 Gửi 3 query trên tới `/chat` (server local, chưa bật Langfuse).
