@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Observability Lab Demo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-container">
+    <header class="app-header">
+      <div class="logo">O11y<span>Lab</span></div>
+      <div class="nav-links">
+        <a href="/dashboard" target="_blank">Full Dashboard</a>
+        <div id="status-indicator" class="status healthy">System Healthy</div>
+      </div>
+    </header>
+
+    <main class="main-content">
+      <section class="chat-section glass-panel">
+        <div class="panel-header">
+          <h2>RAG AI Chat</h2>
+          <span class="badge">Session: s_demo_01</span>
+        </div>
+        <div class="chat-messages" id="chat-messages">
+          <div class="message system">
+            <div class="bubble">System initialized. Type a message to test the RAG flow.</div>
+          </div>
+        </div>
+        <form class="chat-input-area" id="chat-form">
+          <input type="text" id="chat-input" placeholder="Message the AI..." autocomplete="off" required>
+          <button type="submit">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+          </button>
+        </form>
+      </section>
+
+      <div class="right-panel">
+        <section class="controls-section glass-panel">
+          <div class="panel-header">
+            <h2>Incident Controls</h2>
+          </div>
+          <div class="control-grid">
+            <label class="toggle-control">
+              <span class="toggle-label">RAG Slowdown Incident (5s delay)</span>
+              <input type="checkbox" id="toggle-rag_slow">
+              <span class="slider"></span>
+            </label>
+            <label class="toggle-control">
+              <span class="toggle-label">LLM Error Injection</span>
+              <input type="checkbox" id="toggle-llm_error">
+              <span class="slider"></span>
+            </label>
+            <label class="toggle-control">
+              <span class="toggle-label">PII Leak Incident</span>
+              <input type="checkbox" id="toggle-pii_leak">
+              <span class="slider"></span>
+            </label>
+          </div>
+        </section>
+
+        <section class="dashboard-section glass-panel">
+          <div class="panel-header">
+            <h2>Real-time Metrics</h2>
+            <button id="refresh-dashboard" class="icon-btn" title="Refresh">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+            </button>
+          </div>
+          <iframe src="/dashboard" class="dashboard-frame" id="dashboard-frame"></iframe>
+        </section>
+      </div>
+    </main>
+  </div>
+  <script src="script.js"></script>
+</body>
+</html>

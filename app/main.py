@@ -4,6 +4,7 @@ import os
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from structlog.contextvars import bind_contextvars
 
 from .agent import LabAgent
@@ -21,6 +22,10 @@ log = get_logger()
 app = FastAPI(title="Day 13 Observability Lab")
 app.add_middleware(CorrelationIdMiddleware)
 agent = LabAgent()
+
+WEB_UI_DIR = os.path.join(os.path.dirname(__file__), "..", "web_ui")
+os.makedirs(WEB_UI_DIR, exist_ok=True)
+app.mount("/demo", StaticFiles(directory=WEB_UI_DIR, html=True), name="web_ui")
 
 
 @app.on_event("startup")

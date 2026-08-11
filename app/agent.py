@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from structlog.contextvars import get_contextvars
 
 from . import metrics
-from .mock_llm import FakeLLM
+from .real_llm import OpenAILLM
 from .mock_rag import retrieve
 from .pii import hash_user_id, summarize_text
 from .prompt_management import resolve_prompt
@@ -25,9 +25,9 @@ class AgentResult:
 
 
 class LabAgent:
-    def __init__(self, model: str = "claude-sonnet-4-5") -> None:
+    def __init__(self, model: str = "gpt-4o-mini") -> None:
         self.model = model
-        self.llm = FakeLLM(model=model)
+        self.llm = OpenAILLM(model=model)
 
     @observe(as_type="generation", capture_input=False, capture_output=False)
     def run(self, user_id: str, feature: str, session_id: str, message: str) -> AgentResult:
