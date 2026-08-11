@@ -8,6 +8,8 @@ Phần triển khai và evidence runtime ở CP2 được ghi tại
 [CP2_METRICS_DASHBOARD.md](CP2_METRICS_DASHBOARD.md).
 Kết quả đọc metrics của challenge ở CP3 được ghi tại
 [CP3_METRICS_FINDINGS.md](CP3_METRICS_FINDINGS.md).
+Kết quả rà soát ảnh và bản tích hợp cuối được ghi tại
+[CP4_DASHBOARD_FINAL_REVIEW.md](CP4_DASHBOARD_FINAL_REVIEW.md).
 
 Trường `query` trong YAML là pseudocode mô tả phép tính, không phải câu lệnh để copy nguyên vào mọi công cụ. Nhóm chuyển cùng logic đó sang cú pháp của công cụ đã chọn.
 

@@ -63,6 +63,10 @@ nghiệm người dùng. Nhận xét này không thay thế bằng chứng trace
 - `submission/evidence/dashboard-cp3-incident.png`: dashboard sau challenge, P95
   hiển thị 2.651 ms trong cửa sổ 60 phút.
 
-Hiện nhánh chưa có feature metadata từ phần Logging đã merge, nên script ghi rõ
-scope bằng phase marker. Sau khi merge phần Logging, có thể chạy lại để evidence
+Ở lượt chạy CP3 ban đầu, nhánh chưa có feature metadata từ phần Logging, nên
+script ghi rõ scope bằng phase marker. Sau khi merge phần Logging, evidence có thể
 được scope trực tiếp theo `feature=monitoring`.
+
+Việc chạy lại trên bản tích hợp đã hoàn thành ở CP4; xem
+[CP4_DASHBOARD_FINAL_REVIEW.md](CP4_DASHBOARD_FINAL_REVIEW.md) và evidence
+`submission/evidence/cp4-final-metrics-analysis.txt`.
